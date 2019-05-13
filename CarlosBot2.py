@@ -8,10 +8,7 @@ import random, math, time, sys, json
 
 # TODO
 # Implement Tarot, Madlib
-# Replace self.type system with decorators which will handle sending
-#  Decorator for single type? Default somehow?
-#  Replace type logic in on_message with a simple  `await response(message)`
-# How to implement commands like -role ?
+# Add command to create join link
 # Add test cases, will need to create a dummy command object
 # Update main docstring
 
