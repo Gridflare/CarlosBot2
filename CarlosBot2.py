@@ -374,7 +374,7 @@ class response(): # designed this way for testability
     def role(self, targetRole):
         """UTILITIES# : Assign a role, if possible"""
         validroles = list(filter(self.roleIsAssignable, self.cmd.guild.roles))
-        if targetRole.lower() not in list(map(lambda r: r.name, validroles)):
+        if targetRole.lower() not in list(map(lambda r: r.name.lower(), validroles)):
             self.msg = 'Invalid Role'
             return
 
