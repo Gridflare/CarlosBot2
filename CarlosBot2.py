@@ -391,6 +391,12 @@ class response(): # designed this way for testability
                     self.msg = 'Enjoy your new role!'
                 break
 
+    def link(self, args):
+        """UTILITIES# : Get the link to add me to a server"""
+        self.msg = ('https://discordapp.com/oauth2/authorize?client_id=' +
+                    str(client.user.id) +
+                    '&scope=bot&permissions=0')
+
 
     @admincmd
     def stop(self, args):
