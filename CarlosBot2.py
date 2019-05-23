@@ -46,7 +46,7 @@ loggingconf = dict( #TEMP move to config file when possible
             'level':'DEBUG'
             # ~ 'handlers':['console','file']
             },
-        'message':{
+        'event':{
             'level':'DEBUG',
             'handlers':['console'],
             'propagate':False
@@ -430,7 +430,7 @@ async def on_ready():
 
 @client.event
 async def on_message(message):
-    logging.getLogger('message').debug(
+    logging.getLogger('event').debug(
         f'{message.guild}|{message.channel}|{message.author}:{message.content}')
     if message.content.startswith(config['cmdpfx']) and not message.author.bot:
         resp = response(message)
@@ -459,6 +459,37 @@ async def on_message(message):
 
         else:
             resp.log.error(f'Unknown response type {resp["type"]}')
+
+def getDefaultChannel(guild):
+    # TODO move to config
+    candidates = ['general','log']
+
+    guildchannels = guild.channels
+
+    for chan in guildchannels:
+        if chan.name in candidates:
+            return chan
+
+    raise Exception('Member joined but no suitable channel found')
+
+@client.event # greets new members
+async def on_member_join(member):
+    server = member.guild
+
+    fmt = '**{0.name}**, welcome to {1.name}! :grinning:'
+    logging.getLogger('event').info(
+        time.strftime('%X') + '|' + member.name + ' has joined ' + server.name)
+    msg = await sendmsg(getDefaultChannel(server), fmt.format(member, server))
+    await msg.add_reaction('\U0001F44B')
+
+@client.event # announces departures
+async def on_member_remove(member):
+    server = member.guild
+
+    fmt = '**{0.name}** has departed :disappointed:'
+    logging.getLogger('event').info(
+    time.strftime('%X') + '|' + member.name + ' has left ' + server.name)
+    await sendmsg(getDefaultChannel(server), fmt.format(member))
 
 if __name__ == '__main__':
 
