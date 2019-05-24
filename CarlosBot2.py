@@ -397,6 +397,14 @@ class response(): # designed this way for testability
                     str(client.user.id) +
                     '&scope=bot&permissions=0')
 
+    def jointime(self, user):
+        """UTILITIES# <member>: Get the time a user joined the server"""
+        guild = self.cmd.guild
+        memberObj = guild.get_member_named(user)
+        if memberObj is None:
+            self.msg = 'Could not find user ' + user
+        else:
+            self.msg = str(memberObj.joined_at)
 
     @admincmd
     def stop(self, args):
