@@ -175,11 +175,13 @@ class response(): # designed this way for testability
             func, args = cmd.content[len(config['cmdpfx']):].split(sep=None,maxsplit=1)
         except ValueError: # No args given
              func, args = cmd.content[len(config['cmdpfx']):], None
-        try: # Call the command
+
+        if hasattr(self, func): # Call the command
             getattr(self, func)(args)
-        except AttributeError:
-            self.log.exception('Unknown command called')
-            self.msg=f'Unknown command `{func}`'
+        else:
+            self.log.exception(f'Unknown command called: {func}')
+            # ~ self.msg=f'Unknown command `{func}`'
+            self.type = 'silent'
 
     ####################
     # GREETINGS & More #
@@ -453,6 +455,9 @@ async def on_message(message):
             tmp = await sendmsg(resp.ch,next(resp.msgs))
             for msg in resp.msgs: # Handle long running routines
                 await tmp.edit(content=msg)
+
+        if resp.type == 'silent':
+            return
 
         elif resp.type == 'action':
             func, args = resp.action
