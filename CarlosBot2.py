@@ -364,7 +364,7 @@ class response(): # designed this way for testability
 
     def roles(self, args):
         """UTILITIES# : List the roles on this server"""
-        validroles = ['```Roles on this server:']
+        validroles = ['```Roles I can give you:']
         validroles.extend(map(lambda r: r.name,
             filter(self.roleIsAssignable, self.cmd.guild.roles)))
         validroles.append('```')
