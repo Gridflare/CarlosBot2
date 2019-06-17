@@ -364,6 +364,10 @@ class response(): # designed this way for testability
 
         return True
 
+    def source(self, args):
+        """UTILITIES# : Link to my source code"""
+        self.msg = 'https://github.com/Gridflare/CarlosBot2'
+
     def roles(self, args):
         """UTILITIES# : List the roles on this server"""
         validroles = ['```Roles I can give you:']
