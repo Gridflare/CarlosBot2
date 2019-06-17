@@ -460,7 +460,7 @@ async def on_message(message):
             for msg in resp.msgs: # Handle long running routines
                 await tmp.edit(content=msg)
 
-        if resp.type == 'silent':
+        elif resp.type == 'silent':
             return
 
         elif resp.type == 'action':
@@ -475,7 +475,7 @@ async def on_message(message):
                     await sendmsg(resp.ch, 'An unhandled error has occcured')
 
         else:
-            resp.log.error(f'Unknown response type {resp["type"]}')
+            resp.log.error(f'Unknown response type {resp.type}')
 
 def getDefaultChannel(guild):
     # TODO move to config
