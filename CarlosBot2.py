@@ -317,7 +317,7 @@ class response(): # designed this way for testability
         self.msgs = gameSequence()
 
     def madlib(self, args):
-        """RNG# : Not yet implemented"""
+        """RNG# : Fill in my blanks!"""
 
         titleRegex = re.compile(r'<title>(.+)</title>')
         wordRegex = re.compile(r'<td align=\'right\'>([A-Z \(\)",.<>]+) <b>\[(\d+)\]')
