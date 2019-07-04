@@ -3,8 +3,8 @@ A Discord Bot
 """
 
 import logging, logging.config, asyncio
+import random, math, time, sys, json, re, html
 import discord, requests
-import random, math, time, sys, json
 
 # TODO
 # Implement Tarot, Madlib
@@ -316,6 +316,81 @@ class response(): # designed this way for testability
 
         self.msgs = gameSequence()
 
+    def madlib(self, args):
+        """RNG# : Not yet implemented"""
+
+        titleRegex = re.compile(r'<title>(.+)</title>')
+        wordRegex = re.compile(r'<td align=\'right\'>([A-Z \(\)",.<>]+) <b>\[(\d+)\]')
+        adlibRegex = re.compile(r"<td align='left'>\n\s+(.+)")
+
+        # Find the range of adlibs we can get and choose one
+        def findAndProcessAdlib():
+            numAdlibs = int(
+                re.search(r'<meta name="title" content="(\d+) Free Online ad-Lib',
+                requests.get('https://www.madtakes.com/index.php').text).group(1))
+            adlibNum = random.randint(1,numAdlibs)
+
+            adlibHTML = requests.get(
+                f'https://www.madtakes.com/printglib.php?glibid={adlibNum}').text
+
+            # Clean up globally
+            adlibHTML = html.unescape(adlibHTML).replace('`',"'")
+
+            # Get title
+            adlibTitle = titleRegex.search(adlibHTML).group(1)
+
+            # Get wordlist, as (TYPE, NUM) pairs, sort, and simplify
+            wordPrompts = wordRegex.findall(adlibHTML)
+            wordPrompts = sorted(wordPrompts, key=lambda t: int(t[1]))
+            wordPrompts = [t[0].replace('<BR>',' ') for t in wordPrompts]
+
+            # Get adlib
+            adlibText = adlibRegex.search(adlibHTML).group(1)
+            adlibText = adlibText.replace('<br>','\n')
+            adlibText = re.sub( # Convert HTML to Python format string
+                r"<sub><sub>.+?\[(\d+)\].+?<sup><\/sup>",
+                r'*{\1}*',adlibText)
+
+            if len(adlibText) > 1600:
+                self.log.warning('Found adlib that was too long!')
+                return findAndProcessAdlib()
+            else:
+                return adlibTitle, wordPrompts, adlibText, adlibNum, numAdlibs
+
+        def madlibSequence():
+            adlibTitle, wordPrompts, adlibText, adlibNum, numAdlibs = findAndProcessAdlib()
+            self.log.info(f'Using adlib {adlibTitle} #{adlibNum}')
+            promptResponses = []
+
+            for prompt in wordPrompts:
+                usrmsg = yield 'Give me a(n) ' + prompt
+                promptResponses.append(usrmsg)
+
+            completedAdlib = f'**{adlibTitle}** #{adlibNum}/{numAdlibs}\n'
+            completedAdlib += adlibText.format(None, *promptResponses)
+            yield completedAdlib
+
+        self.type = 'convo'
+        self.msg = 'Finding a madlib, this may take a moment...'
+        self.msgs = madlibSequence()
+
+
+    @hiddencmd
+    def convotest(self, args):
+        # Just a demo of how to use the 'convo' message type
+        self.type = 'convo'
+        self.msg = 'Repeat after me!'
+        def convogen():
+            mylist = ['one','two','three','four']
+            for i in mylist:
+                usrmsg = yield i
+                if usrmsg != i:
+                    yield 'You failed!'
+                    raise StopIteration()
+            yield 'You did it!'
+
+        self.msgs = convogen()
+
     @hiddencmd
     def ddg(self, args): self.duckduckgun(args)
 
@@ -454,6 +529,23 @@ async def on_message(message):
         elif resp.type == 'series':
             for msg in resp.msgs: # Handle long running routines
                 await sendmsg(resp.ch, msg)
+
+        elif resp.type == 'convo': # For conversations
+            # Handle a pre-message if it exists
+            if hasattr(resp, 'msg'): await sendmsg(resp.ch, resp.msg)
+
+            def check(m):
+                return m.channel == resp.ch and not m.author.bot
+
+            try: # Run to completion
+                await sendmsg(resp.ch, resp.msgs.send(None))
+                while True:
+                    usermsg = await client.wait_for('message', check=check, timeout=120)
+                    await sendmsg(resp.ch, resp.msgs.send(usermsg.content))
+            except asyncio.TimeoutError:
+                await sendmsg(resp.ch, 'Timed out waiting for a response')
+            except StopIteration:
+                pass
 
         elif resp.type == 'edits':
             tmp = await sendmsg(resp.ch,next(resp.msgs))
