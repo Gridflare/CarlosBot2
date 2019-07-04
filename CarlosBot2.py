@@ -216,7 +216,7 @@ class response(): # designed this way for testability
         self.msg = ('heads','tails')[random.randint(0, 1)]
 
     def roll(self,args):
-        """RNG# <max>: Roll a die"""
+        """RNG# [max]: Roll a die"""
         if args is not None and args.isdecimal():
             self.msg = 'You rolled a ' + str(random.randint(1, int(args)))
         else:
@@ -283,9 +283,7 @@ class response(): # designed this way for testability
     def tarot(self, args):
         """RNG# : Not Implemented"""
         self.msg = 'Not implemented'
-    def madlib(self, args):
-        """RNG# : Not Implemented"""
-        self.msg = 'Not implemented'
+
     def rname(self, args):
         """RNG# : Not Implemented"""
         self.msg = 'Not implemented'
@@ -317,18 +315,27 @@ class response(): # designed this way for testability
         self.msgs = gameSequence()
 
     def madlib(self, args):
-        """RNG# : Fill in my blanks!"""
+        """RNG# [maxPrompts] : Fill in my blanks! Optionally specify a max size"""
 
         titleRegex = re.compile(r'<title>(.+)</title>')
-        wordRegex = re.compile(r'<td align=\'right\'>([A-Z \(\)",.<>]+) <b>\[(\d+)\]')
+        wordRegex = re.compile(r'<td align=\'right\'>(.+) <b>\[(\d+)\]')
         adlibRegex = re.compile(r"<td align='left'>\n\s+(.+)")
+
+        blacklist = [117, 163] # adlibs known to not work well
+
+        maxPrompts = 30
+        if args:
+            try: maxPrompts = min(int(args), 10) # Need a minimum maximum
+            except: pass
 
         # Find the range of adlibs we can get and choose one
         def findAndProcessAdlib():
             numAdlibs = int(
                 re.search(r'<meta name="title" content="(\d+) Free Online ad-Lib',
                 requests.get('https://www.madtakes.com/index.php').text).group(1))
-            adlibNum = random.randint(1,numAdlibs)
+            while True:
+                adlibNum = random.randint(1,numAdlibs)
+                if adlibNum not in blacklist: break
 
             adlibHTML = requests.get(
                 f'https://www.madtakes.com/printglib.php?glibid={adlibNum}').text
@@ -351,7 +358,7 @@ class response(): # designed this way for testability
                 r"<sub><sub>.+?\[(\d+)\].+?<sup><\/sup>",
                 r'*{\1}*',adlibText)
 
-            if len(adlibText) > 1600:
+            if len(adlibText) > 1700 or len(wordPrompts) > maxPrompts:
                 self.log.warning('Found adlib that was too long!')
                 return findAndProcessAdlib()
             else:
@@ -373,7 +380,6 @@ class response(): # designed this way for testability
         self.type = 'convo'
         self.msg = 'Finding a madlib, this may take a moment...'
         self.msgs = madlibSequence()
-
 
     @hiddencmd
     def convotest(self, args):
@@ -543,7 +549,12 @@ async def on_message(message):
                     usermsg = await client.wait_for('message', check=check, timeout=120)
                     await sendmsg(resp.ch, resp.msgs.send(usermsg.content))
             except asyncio.TimeoutError:
-                await sendmsg(resp.ch, 'Timed out waiting for a response')
+                try: # establish whether the routine finished or not
+                    resp.msgs.send(None)
+                except StopIteration:
+                    pass # if it is finished, be silent
+                else:
+                    await sendmsg(resp.ch, 'Timed out waiting for a response')
             except StopIteration:
                 pass
 
