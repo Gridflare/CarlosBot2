@@ -293,7 +293,9 @@ class response(): # designed this way for testability
 
     def duckduckgun(self, args):
         """RNG# <num1> <num2> : a game of dodging bullets, pick two numbers 1-6"""
-        if len(args) == 0: print(">ddg <num1> <num2> : a game of dodging bullets, pick two numbers 1-6")
+        if args is None or len(args) < 2:
+            self.msg = f"Usage: {config['cmdpfx']}ddg <num1> <num2> : a game of dodging bullets, pick two numbers 1-6"
+            return
         self.type = 'edits'
         if len(args) > 2: userInput = args[:2]
         else: userInput = args
