@@ -235,7 +235,10 @@ class response(): # designed this way for testability
         insultAdjectives = resources['insults']['adjectives']
         insultNouns = resources['insults']['nouns']
         def genInsult():
-            return f', you are a {random.choice(insultAdjectives)} {random.choice(insultNouns)}!'
+            adj = random.choice(insultAdjectives)
+            noun = random.choice(insultNouns)
+            a = 'an' if adj.startswith(('a','e','i','o','u')) else 'a'
+            return f', you are {a} {adj} {noun}!'
         if len(self.cmd.mentions) == 0:  # insults the author if they mention nobody
             target = self.cmd.author
             self.msg = target.name + genInsult()
@@ -290,6 +293,7 @@ class response(): # designed this way for testability
 
     def duckduckgun(self, args):
         """RNG# <num1> <num2> : a game of dodging bullets, pick two numbers 1-6"""
+        if len(args) == 0: print(">ddg <num1> <num2> : a game of dodging bullets, pick two numbers 1-6")
         self.type = 'edits'
         if len(args) > 2: userInput = args[:2]
         else: userInput = args
