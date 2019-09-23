@@ -316,6 +316,9 @@ class response(): # designed this way for testability
 
     def madlib(self, args):
         """RNG# [maxPrompts] : Fill in my blanks! Optionally specify a max size"""
+        if 'bot' not in self.cmd.channel.name:
+            self.msg = "This feature is restricted to bot channels"
+            return
 
         titleRegex = re.compile(r'<title>(.+)</title>')
         wordRegex = re.compile(r'<td align=\'right\'>(.+) <b>\[(\d+)\]')
