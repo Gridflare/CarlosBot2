@@ -637,7 +637,7 @@ async def on_message_delete(message):
     async for entry in g.audit_logs(action=discord.AuditLogAction.message_delete):
         delBy = entry.user
 
-    deletionMsg = f'{delBy} deleted message by {msgBy}: "{message.content}"'
+    deletionMsg = f'{delBy} deleted message by {msgBy} in #{message.channel.name}: "{message.content}"'
 
     await sendmsg(log_chan, deletionMsg)
 
