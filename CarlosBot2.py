@@ -133,7 +133,7 @@ def genHelpTxt():
 
 ## DECORATORS/WRAPPERS ##
 
-async def sendmsg(channel,msg,**kwargs):
+async def sendmsg(channel, msg, **kwargs):
     '''helper for concise message sending'''
     return await channel.send(msg.replace("@everyone", "@\u200beveryone"))
 
@@ -619,6 +619,28 @@ async def on_member_remove(member):
     logging.getLogger('event').info(
     time.strftime('%X') + '|' + member.name + ' has left ' + server.name)
     await sendmsg(getDefaultChannel(server), fmt.format(member))
+
+@client.event # Log msg deletion
+async def on_message_delete(message):
+    msgBy = message.author.name
+    logging.getLogger('event').info(f'Message by {msgBy} deleted')
+    g = message.guild
+
+    log_chan = None
+    for c in g.channels:
+        if c.name == 'deletion_log':
+            log_chan = c
+            break
+    else: return # Channel does not exist
+
+    delBy = None
+    async for entry in g.audit_logs(action=discord.AuditLogAction.message_delete):
+        delBy = entry.user
+
+    deletionMsg = f'{delBy} deleted message by {msgBy}: "{message.content}"'
+
+    await sendmsg(log_chan, deletionMsg)
+
 
 if __name__ == '__main__':
 
