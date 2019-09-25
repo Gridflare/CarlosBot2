@@ -4,6 +4,8 @@ A Discord Bot
 
 import logging, logging.config, asyncio
 import random, math, time, sys, json, re, html
+from datetime import datetime as dt
+from datetime import timedelta as td
 import discord, requests
 
 # TODO
@@ -634,10 +636,19 @@ async def on_message_delete(message):
     else: return # Channel does not exist
 
     delBy = None
-    async for entry in g.audit_logs(action=discord.AuditLogAction.message_delete):
-        delBy = entry.user
+    beforenow = dt.utcnow() - td(seconds=1)
+    async for entry in g.audit_logs(action=discord.AuditLogAction.message_delete, oldest_first=False , limit=30):
+        if all((entry.target.id == message.author.id,
+                entry.extra.channel.id == message.channel.id,
+                entry.extra.count >= 1,
+                entry.created_at > beforenow)):
+            delBy = entry.user
+            break
 
-    deletionMsg = f'{delBy} deleted message by {msgBy} in #{message.channel.name}: "{message.content}"'
+    if delBy is None:
+        deletionMsg = f'{msgBy} deleted own message in #{message.channel.name}: "{message.content}"'
+    else:
+        deletionMsg = f'{delBy} deleted message from {msgBy} in #{message.channel.name}: "{message.content}"'
 
     await sendmsg(log_chan, deletionMsg)
 
