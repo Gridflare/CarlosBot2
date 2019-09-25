@@ -637,7 +637,7 @@ async def on_message_delete(message):
 
     delBy = None
     beforenow = dt.utcnow() - td(seconds=1)
-    async for entry in g.audit_logs(action=discord.AuditLogAction.message_delete, oldest_first=False , limit=30):
+    async for entry in g.audit_logs(action=discord.AuditLogAction.message_delete, oldest_first=False , limit=10):
         if all((entry.target.id == message.author.id,
                 entry.extra.channel.id == message.channel.id,
                 entry.extra.count >= 1,
