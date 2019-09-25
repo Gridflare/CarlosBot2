@@ -646,9 +646,9 @@ async def on_message_delete(message):
             break
 
     if delBy is None:
-        deletionMsg = f'{msgBy} deleted own message in #{message.channel.name}: "{message.content}"'
+        deletionMsg = f'{msgBy} deleted own message (sent: {message.created_at}) in #{message.channel.name}: "{message.content}"'
     else:
-        deletionMsg = f'{delBy} deleted message from {msgBy} in #{message.channel.name}: "{message.content}"'
+        deletionMsg = f'{delBy} deleted message (sent: {message.created_at})from {msgBy} in #{message.channel.name}: "{message.content}"'
 
     await sendmsg(log_chan, deletionMsg)
 
