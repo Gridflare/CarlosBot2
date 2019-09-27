@@ -462,6 +462,10 @@ class response(): # designed this way for testability
 
     def roles(self, args):
         """UTILITIES# : List the roles on this server"""
+        if args:
+            self.msg = f'Did you mean `{config["cmdpfx"]}role {args}`'
+            return
+
         validroles = ['```Roles I can give you:']
         validroles.extend(map(lambda r: r.name,
             filter(self.roleIsAssignable, self.cmd.guild.roles)))
@@ -648,7 +652,7 @@ async def on_message_delete(message):
     if delBy is None:
         deletionMsg = f'{msgBy} deleted own message (sent: {message.created_at}) in #{message.channel.name}: "{message.content}"'
     else:
-        deletionMsg = f'{delBy} deleted message (sent: {message.created_at})from {msgBy} in #{message.channel.name}: "{message.content}"'
+        deletionMsg = f'{delBy} deleted message (sent: {message.created_at}) from {msgBy} in #{message.channel.name}: "{message.content}"'
 
     await sendmsg(log_chan, deletionMsg)
 
