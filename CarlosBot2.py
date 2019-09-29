@@ -6,6 +6,7 @@ import logging, logging.config, asyncio
 import random, math, time, sys, json, re, html
 from datetime import datetime as dt
 from datetime import timedelta as td
+from dateutil import tz
 import discord, requests
 
 # TODO
@@ -384,11 +385,13 @@ class response(): # designed this way for testability
                 usrmsg = yield 'Give me a(n) ' + prompt
                 promptResponses.append(usrmsg)
 
+            self.convoFinished = True
             completedAdlib = f'**{adlibTitle}** #{adlibNum}/{numAdlibs}\n'
             completedAdlib += adlibText.format(None, *promptResponses)
             yield completedAdlib
 
         self.type = 'convo'
+        self.purgeAfter = True
         self.msg = 'Finding a madlib, this may take a moment...'
         self.msgs = madlibSequence()
 
@@ -448,7 +451,7 @@ class response(): # designed this way for testability
     def roleIsAssignable(self, role):
         if role.name == '@everyone': return False
         # If the requested role has a denied permission, return false
-        if any(getattr(role.permissions,up) for up in config['unassignablePermissions']):
+        if any(getattr(role.permissions, up) for up in config['unassignablePermissions']):
             return False
         # If the role is higher than us, return false
         if role >= self.cmd.guild.get_member(client.user.id).top_role:
@@ -540,8 +543,8 @@ async def on_ready():
 
 @client.event
 async def on_message(message):
-    logging.getLogger('event').debug(
-        f'{message.guild}|{message.channel}|{message.author}:{message.content}')
+    log = logging.getLogger('event')
+    log.debug(f'{message.guild}|{message.channel}|{message.author}:{message.content}')
     if message.content.startswith(config['cmdpfx']) and not message.author.bot:
         resp = response(message)
         if resp.type == 'single':
@@ -552,26 +555,56 @@ async def on_message(message):
                 await sendmsg(resp.ch, msg)
 
         elif resp.type == 'convo': # For conversations
+            convoStartTime = dt.utcnow()
+             # Whether to purge the conversation middle
+            if hasattr(resp, 'purgeAfter') and resp.purgeAfter:
+                purgeAfter = True
+            else:
+                purgeAfter = False
+            log.debug(f'Convo: purgeAfter={purgeAfter}')
             # Handle a pre-message if it exists
             if hasattr(resp, 'msg'): await sendmsg(resp.ch, resp.msg)
+            # Prepare the stop flag
+            if not hasattr(resp, 'convoFinished'): resp.convoFinished = False
 
             def check(m):
                 return m.channel == resp.ch and not m.author.bot
 
+            # ~ timeout = False
             try: # Run to completion
                 await sendmsg(resp.ch, resp.msgs.send(None))
-                while True:
-                    usermsg = await client.wait_for('message', check=check, timeout=120)
-                    await sendmsg(resp.ch, resp.msgs.send(usermsg.content))
+                while not resp.convoFinished:
+                    convoEndTime = dt.utcnow() # Keep updated
+                    usermsg = await client.wait_for('message', check=check, timeout=90)
+                    lastmsg = await sendmsg(resp.ch, resp.msgs.send(usermsg.content))
+                convoEndTime = dt.utcnow()
             except asyncio.TimeoutError:
                 try: # establish whether the routine finished or not
+                    # This might now be redundant with the new convoFinished
+                    # but better safe than sorry.
                     resp.msgs.send(None)
                 except StopIteration:
                     pass # if it is finished, be silent
                 else:
+                    # ~ timeout = True
                     await sendmsg(resp.ch, 'Timed out waiting for a response')
             except StopIteration:
                 pass
+
+            # ~ if not timeout: convoEndTime = dt.utcnow()
+            log.info(f'Convo completed in {convoEndTime-convoStartTime}')
+
+            if purgeAfter:
+                def check(m):
+                    # TODO make this a single return
+                    if resp.convoFinished: # If the convo was finished, save final message
+                        return lastmsg.id != m.id and convoStartTime < m.created_at < convoEndTime
+                    else:
+                        return convoStartTime < m.created_at < convoEndTime
+                try:
+                    await resp.ch.purge(check=check)
+                except discord.DiscordException as e:
+                    log.exeption('Failed to purge convo:')
 
         elif resp.type == 'edits':
             tmp = await sendmsg(resp.ch,next(resp.msgs))
@@ -605,7 +638,7 @@ def getDefaultChannel(guild):
         if chan.name in candidates:
             return chan
 
-    raise Exception('Member joined but no suitable channel found')
+    logging.getLogger('event').warning('No default channel found')
 
 @client.event # greets new members
 async def on_member_join(member):
@@ -628,8 +661,7 @@ async def on_member_remove(member):
 
 @client.event # Log msg deletion
 async def on_message_delete(message):
-    msgBy = message.author.name
-    logging.getLogger('event').info(f'Message by {msgBy} deleted')
+    logging.getLogger('event').info(f'Message by {message.author.name} deleted')
     g = message.guild
 
     log_chan = None
@@ -649,12 +681,44 @@ async def on_message_delete(message):
             delBy = entry.user
             break
 
+    msgBy = message.author.name
+    sentTime = message.created_at.replace(tzinfo=tz.gettz('UTC')).astimezone(tz.gettz('America/Toronto'))
+    content = message.content if len(message.content) <= 200 else message.content[:200] + '...'
     if delBy is None:
-        deletionMsg = f'{msgBy} deleted own message (sent: {message.created_at}) in #{message.channel.name}: "{message.content}"'
+        deletionMsg = f'DELETE: **{msgBy}** deleted own message (sent: {sentTime}) in **#{message.channel.name}**: "{content}"'
     else:
-        deletionMsg = f'{delBy} deleted message (sent: {message.created_at}) from {msgBy} in #{message.channel.name}: "{message.content}"'
+        deletionMsg = f'DELETE: **{delBy}** deleted message (sent: {sentTime}) from **{msgBy}** in **#{message.channel.name}**: "{content}"'
 
     await sendmsg(log_chan, deletionMsg)
+
+@client.event # Log msg deletion
+async def on_bulk_message_delete(messages):
+    g = messages[0].guild
+    logging.getLogger('event').info(f'Bulk purge in {g.name}')
+
+    log_chan = None
+    for c in g.channels:
+        if c.name == 'deletion_log':
+            log_chan = c
+            break
+    else: return # Channel does not exist
+
+    purgeMsg = f'Purge in {messages[0].channel.name}\n'
+
+    for msg in messages:
+        msgBy = msg.author.name
+        sentTime = msg.created_at.replace(tzinfo=tz.gettz('UTC')).astimezone(tz.gettz('America/Toronto'))
+        content = msg.content if len(msg.content) <= 200 else msg.content[:200] + '...'
+        deletionMsg = f'PURGE: Message from **{msgBy}** purged (sent: {sentTime}) in **#{msg.channel.name}**: "{content}"\n'
+
+        if len(purgeMsg) + len(deletionMsg) >= 2000:
+            # If we are over limit, send
+            await sendmsg(log_chan, purgeMsg)
+            purgeMsg = ''
+
+        purgeMsg += deletionMsg
+
+    await sendmsg(log_chan, purgeMsg)
 
 
 if __name__ == '__main__':
